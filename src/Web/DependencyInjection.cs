@@ -2,6 +2,7 @@ using Azure.Identity;
 using CleanArchitecture.Application.Common.Interfaces;
 using CleanArchitecture.Infrastructure.Data;
 using CleanArchitecture.Web.Services;
+using CleanArchitecture.Web.TodoArchive;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Microsoft.Extensions.DependencyInjection;
@@ -34,6 +35,20 @@ public static class DependencyInjection
         });
 
         builder.Services.AddCors();
+
+        builder.AddTodoArchiveModule();
+    }
+
+    /// <summary>
+    /// Registers the todo archive module: its scheduled entry point
+    /// (<see cref="TodoArchiveReconciliationWorker"/>) and its message entry point
+    /// (<see cref="TodoArchiveMessageConsumer"/>).
+    /// </summary>
+    private static void AddTodoArchiveModule(this IHostApplicationBuilder builder)
+    {
+        builder.Services.AddHostedService<TodoArchiveReconciliationWorker>();
+
+        builder.Services.AddScoped<TodoArchiveMessageConsumer>();
     }
 
     public static void AddKeyVaultIfConfigured(this IHostApplicationBuilder builder)
