@@ -49,6 +49,9 @@ public static class DependencyInjection
         builder.Services.AddHostedService<TodoArchiveReconciliationWorker>();
 
         builder.Services.AddScoped<TodoArchiveMessageConsumer>();
+
+        // Singleton: the manual approval decisions must outlive the request that records them.
+        builder.Services.AddSingleton<TodoArchiveApprovalGate>();
     }
 
     public static void AddKeyVaultIfConfigured(this IHostApplicationBuilder builder)
