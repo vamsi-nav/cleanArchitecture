@@ -4,6 +4,7 @@ import { TodoListsClient, TodoItemsClient,
   CreateTodoListCommand, UpdateTodoListCommand,
   CreateTodoItemCommand, UpdateTodoItemCommand, UpdateTodoItemDetailCommand
 } from '../web-api-client';
+import { ArchivedTodoItem, TodoArchivePurgeState, TodoArchiveService } from './todo-archive.service';
 
 @Component({
   standalone: false,
@@ -32,9 +33,14 @@ export class TasksComponent implements OnInit {
   addingItem = signal(false);
   private originalTitle = '';
 
+  archivedItems = signal<ArchivedTodoItem[]>([]);
+  purgeApprovals = signal<TodoArchivePurgeState[]>([]);
+  archiveError = signal('');
+
   constructor(
     private listsClient: TodoListsClient,
-    private itemsClient: TodoItemsClient
+    private itemsClient: TodoItemsClient,
+    private archiveService: TodoArchiveService
   ) {
     effect(() => { this.selectedListId(); this.newItemTitle = ''; this.addingItem.set(false); });
   }
@@ -49,6 +55,71 @@ export class TasksComponent implements OnInit {
           this.selectedListId.set(result.lists[0].id);
         }
       },
+      error: error => console.error(error)
+    });
+
+    this.loadArchive();
+  }
+
+  // Archive
+  loadArchive(): void {
+    this.archiveService.getArchivedItems().subscribe({
+      next: items => this.archivedItems.set(items),
+      error: error => console.error(error)
+    });
+
+    this.archiveService.getPurgeApprovals().subscribe({
+      next: states => this.purgeApprovals.set(states),
+      error: error => console.error(error)
+    });
+  }
+
+  restoreArchivedItem(item: ArchivedTodoItem): void {
+    this.archiveService.restoreItem(item.id).subscribe({
+      next: () => {
+        this.archivedItems.update(items => items.filter(i => i.id !== item.id));
+        this.loadArchive();
+      },
+      error: error => console.error(error)
+    });
+  }
+
+  requestPurge(item: ArchivedTodoItem): void {
+    this.archiveService.requestPurge(item.id).subscribe({
+      next: () => this.loadArchive(),
+      error: error => console.error(error)
+    });
+  }
+
+  approvePurge(item: ArchivedTodoItem): void {
+    this.archiveService.approvePurge(item.id, true).subscribe({
+      next: () => this.loadArchive(),
+      error: error => console.error(error)
+    });
+  }
+
+  /** Blocked with 409 by the server until the purge has been approved by an operator. */
+  purgeArchivedItem(item: ArchivedTodoItem): void {
+    this.archiveError.set('');
+    this.archiveService.purgeItem(item.id).subscribe({
+      next: () => {
+        this.archivedItems.update(items => items.filter(i => i.id !== item.id));
+        this.loadArchive();
+      },
+      error: () => this.archiveError.set('Purge is still awaiting manual approval.')
+    });
+  }
+
+  showBacklog(): void {
+    this.archiveService.getBacklog().subscribe({
+      next: backlog => console.log(backlog),
+      error: error => console.error(error)
+    });
+  }
+
+  reindexArchive(): void {
+    this.archiveService.reindex().subscribe({
+      next: () => this.loadArchive(),
       error: error => console.error(error)
     });
   }
